@@ -94,8 +94,18 @@
     try {
       if (!scanner) scanner = new Html5Qrcode('reader');
       setStatus('Solicitando acceso a la cámara…');
-      await scanner.start(
-  { facingMode: { exact: 'environment' } },
+      const cameras = await Html5Qrcode.getCameras();
+
+if (!cameras || cameras.length === 0) {
+  throw new Error('No se han encontrado cámaras disponibles.');
+}
+
+const camaraTrasera =
+  cameras.find(c => /back|rear|environment|trasera|posterior/i.test(c.label))
+  || cameras[cameras.length - 1];
+
+await scanner.start(
+  camaraTrasera.id,
   { fps: 10, qrbox: { width: 240, height: 240 } },
   onQrRead
 );
