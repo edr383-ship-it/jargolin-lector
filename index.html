@@ -95,10 +95,10 @@
       if (!scanner) scanner = new Html5Qrcode('reader');
       setStatus('Solicitando acceso a la cámara…');
       await scanner.start(
-        { facingMode: { ideal: 'environment' } },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        onQrRead
-      );
+  { facingMode: 'environment' },
+  { fps: 10, qrbox: { width: 240, height: 240 } },
+  onQrRead
+);
       scanning = true;
       startButton.disabled = true;
       stopButton.disabled = false;
