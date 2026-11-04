@@ -95,7 +95,7 @@
       if (!scanner) scanner = new Html5Qrcode('reader');
       setStatus('Solicitando acceso a la cámara…');
       await scanner.start(
-  { facingMode: 'environment' },
+  { facingMode: { exact: 'environment' } },
   { fps: 10, qrbox: { width: 240, height: 240 } },
   onQrRead
 );
