@@ -103,7 +103,8 @@ if (!cameras || cameras.length === 0) {
 const camaraTrasera =
   cameras.find(c => /back|rear|environment|trasera|posterior/i.test(c.label))
   || cameras[cameras.length - 1];
-
+console.log('CÁMARAS DETECTADAS:', cameras);
+console.log('ID CÁMARA:', camaraTrasera.id, 'TIPO:', typeof camaraTrasera.id);
 await scanner.start(
   camaraTrasera.id,
   { fps: 10, qrbox: { width: 240, height: 240 } },
