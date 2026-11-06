@@ -7,6 +7,7 @@
   <title>Jargolín 2027 · Lector QR</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
+
     * { box-sizing: border-box; }
     body {
       margin: 0; padding: 0 14px 28px; background: #f3f4f6;
@@ -38,6 +39,7 @@
     #status.ok { background: #d9f3e2; color: #146c36; }
     #status.error { background: #fce1df; color: #a32219; }
     .small { color: #65716a; font-size: 13px; line-height: 1.45; }
+    #status {    white-space: pre-line;    }
   </style>
 </head>
 <body>
@@ -155,7 +157,25 @@ await scanner.start(
     if (data.type !== 'JARGOLIN_QR_RESULT') return;
 
     if (data.ok) {
-      setStatus(data.message || 'Entrada validada. Puedes escanear la siguiente familia.', 'ok');
+      const familia = data.familia;
+
+if (familia) {
+  setStatus(
+    '✓ ENTRADA VALIDADA\n\n' +
+    'ID FAMILIA: ' + familia.id + '\n' +
+    'Adulto: ' + familia.adulto + '\n' +
+    'Niños: ' + (familia.ninos.length
+      ? familia.ninos.join(', ')
+      : 'Sin niños') + '\n\n' +
+    'Colocar ' + familia.totalPulseras + ' pulseras.',
+    'ok'
+  );
+} else {
+  setStatus(
+    data.message || 'Entrada validada correctamente.',
+    'ok'
+  );
+}
       waitingForApp = false;
       startButton.disabled = false;
       stopButton.disabled = false;
