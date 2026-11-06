@@ -5,68 +5,126 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#263b32">
   <title>Jargolín 2027 · Lector QR</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <style>
 
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
     * { box-sizing: border-box; }
+
     body {
-      margin: 0; padding: 0 14px 28px; background: #f3f4f6;
-      color: #202124; font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0 14px 28px;
+      background: #f3f4f6;
+      color: #202124;
+      font-family: Arial, sans-serif;
     }
+
     header {
-      margin: 0 -14px 18px; padding: 20px 16px;
-      color: white; background: #263b32; text-align: center;
+      margin: 0 -14px 18px;
+      padding: 20px 16px;
+      color: white;
+      background: #263b32;
+      text-align: center;
     }
+
     h1 { margin: 0; font-size: 23px; }
     header p { margin: 7px 0 0; color: #d6e3da; }
+
     main { max-width: 520px; margin: auto; }
+
     .card {
-      background: white; border-radius: 14px; padding: 18px;
-      margin-bottom: 14px; box-shadow: 0 2px 8px #0000000d;
+      background: white;
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px #0000000d;
     }
+
     button {
-      width: 100%; border: 0; border-radius: 10px; padding: 15px;
-      margin-top: 9px; font-size: 16px; font-weight: bold;
-      color: white; background: #198754;
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 9px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background: #198754;
+      cursor: pointer;
     }
-    button.secondary { color: #263b32; background: #e2e8e4; }
-    button:disabled { opacity: .5; }
-    #reader { width: 100%; overflow: hidden; margin-top: 14px; }
+
+    button.secondary {
+      color: #263b32;
+      background: #e2e8e4;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      margin-top: 14px;
+    }
+
     #status {
-      border-radius: 10px; padding: 13px; background: #eef2ef;
-      line-height: 1.45; overflow-wrap: anywhere;
+      border-radius: 10px;
+      padding: 13px;
+      background: #eef2ef;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-line;
     }
+
     #status.ok { background: #d9f3e2; color: #146c36; }
     #status.error { background: #fce1df; color: #a32219; }
-    .small { color: #65716a; font-size: 13px; line-height: 1.45; }
-    #status {    white-space: pre-line;    }
+
+    .small {
+      color: #65716a;
+      font-size: 13px;
+      line-height: 1.45;
+    }
   </style>
 </head>
+
 <body>
 <header>
   <h1>🎃 JARGOLÍN 2027</h1>
   <p>Lector de códigos QR</p>
 </header>
+
 <main>
   <section class="card">
-    <div id="status">Conecta este lector con la aplicación Jargolín y pulsa «Activar cámara».</div>
+    <div id="status" role="status" aria-live="polite">
+      Conecta este lector con la aplicación Jargolín y pulsa «Activar cámara».
+    </div>
+
     <button id="startButton" type="button">Activar cámara</button>
-    <button id="stopButton" class="secondary" type="button" disabled>Detener cámara</button>
+    <button id="closeButton" class="secondary" type="button">
+      Cerrar lector QR
+    </button>
+
     <div id="reader"></div>
+
     <p class="small">
-      El código QR se enviará a la pestaña de Jargolín para comprobar el pago
-      y validar la entrada. Este lector no guarda los códigos.
+      El código QR se enviará a la pestaña de Jargolín para comprobar
+      el pago y validar la entrada. Este lector no guarda los códigos.
     </p>
   </section>
 </main>
+
 <script>
   let scanner = null;
   let scanning = false;
+  let starting = false;
   let waitingForApp = false;
+  let closing = false;
 
   const statusBox = document.getElementById('status');
   const startButton = document.getElementById('startButton');
-  const stopButton = document.getElementById('stopButton');
+  const closeButton = document.getElementById('closeButton');
 
   function setStatus(text, type) {
     statusBox.textContent = text;
@@ -75,128 +133,221 @@
 
   function notifyParent(payload) {
     if (!window.opener || window.opener.closed) {
-      setStatus('No encuentro la pestaña de Jargolín. Vuelve a la aplicación y abre el lector desde allí.', 'error');
+      setStatus(
+        'No encuentro la pestaña de Jargolín. Vuelve a la aplicación ' +
+        'y abre el lector desde allí.',
+        'error'
+      );
       return false;
     }
+
     window.opener.postMessage(payload, '*');
     return true;
   }
 
+  async function detenerCamara() {
+    if (scanner && scanning) {
+      await scanner.stop();
+      scanning = false;
+    }
+
+    waitingForApp = false;
+  }
+
   async function startScanner() {
-    if (scanning || waitingForApp) return;
+    if (scanning || starting || waitingForApp || closing) return;
+
     if (!window.opener || window.opener.closed) {
-      setStatus('Abre este lector desde el botón de Control de acceso de Jargolín. No lo abras directamente.', 'error');
+      setStatus(
+        'Abre este lector desde el botón de Control de acceso de ' +
+        'Jargolín. No lo abras directamente.',
+        'error'
+      );
       return;
     }
+
     if (!window.Html5Qrcode) {
-      setStatus('No se ha podido cargar el lector QR. Comprueba la conexión a Internet y vuelve a intentarlo.', 'error');
+      setStatus(
+        'No se ha podido cargar el lector QR. Comprueba la conexión ' +
+        'a Internet y vuelve a intentarlo.',
+        'error'
+      );
       return;
     }
+
+    starting = true;
+    startButton.disabled = true;
 
     try {
       if (!scanner) scanner = new Html5Qrcode('reader');
+
       setStatus('Solicitando acceso a la cámara…');
+
       const cameras = await Html5Qrcode.getCameras();
 
-if (!cameras || cameras.length === 0) {
-  throw new Error('No se han encontrado cámaras disponibles.');
-}
+      if (closing) return;
 
-const camaraTrasera =
-  cameras.find(c => /back|rear|environment|trasera|posterior/i.test(c.label))
-  || cameras[cameras.length - 1];
-console.log('CÁMARAS DETECTADAS:', cameras);
-console.log('ID CÁMARA:', camaraTrasera.id, 'TIPO:', typeof camaraTrasera.id);
-await scanner.start(
-  camaraTrasera.id,
-  { fps: 10, qrbox: { width: 240, height: 240 } },
-  onQrRead
-);
+      if (!cameras || cameras.length === 0) {
+        throw new Error('No se han encontrado cámaras disponibles.');
+      }
+
+      const camaraTrasera =
+        cameras.find(c =>
+          /back|rear|environment|trasera|posterior/i.test(c.label)
+        ) || cameras[cameras.length - 1];
+
+      await scanner.start(
+        camaraTrasera.id,
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        onQrRead
+      );
+
       scanning = true;
-      startButton.disabled = true;
-      stopButton.disabled = false;
+
+      if (closing) {
+        await detenerCamara();
+        return;
+      }
+
       setStatus('Cámara activa. Enfoca el código QR de la familia.');
     } catch (error) {
-      scanning = false;
-      startButton.disabled = false;
-      stopButton.disabled = true;
-      setStatus('No se pudo activar la cámara: ' + (error.message || String(error)), 'error');
+      setStatus(
+        'No se pudo activar la cámara: ' +
+        (error.message || String(error)),
+        'error'
+      );
+    } finally {
+      starting = false;
+      startButton.disabled = scanning || closing;
+    }
+  }
+
+  async function reanudarCamara() {
+    if (!scanner || !scanning || closing) return;
+
+    try {
+      scanner.resume();
+    } catch (error) {
+      setStatus(
+        'No se pudo reanudar la cámara. Cierra el lector y vuelve a ' +
+        'abrirlo: ' + (error.message || String(error)),
+        'error'
+      );
     }
   }
 
   async function onQrRead(decodedText) {
-    if (waitingForApp) return;
+    if (waitingForApp || closing) return;
+
     waitingForApp = true;
+
     try {
-      await scanner.pause(true);
-    } catch (_) {}
-    startButton.disabled = true;
-    stopButton.disabled = false;
+      scanner.pause(true);
+    } catch (error) {
+      waitingForApp = false;
+      setStatus(
+        'No se pudo pausar la lectura del QR: ' +
+        (error.message || String(error)),
+        'error'
+      );
+      return;
+    }
+
     setStatus('QR leído. Enviando a Jargolín para validar la entrada…');
-    const sent = notifyParent({ type: 'JARGOLIN_QR_SCAN', token: decodedText });
+
+    const sent = notifyParent({
+      type: 'JARGOLIN_QR_SCAN',
+      token: decodedText
+    });
+
     if (!sent) {
       waitingForApp = false;
-      try { scanner.resume(); } catch (_) {}
+      await reanudarCamara();
     }
   }
 
-  async function stopScanner() {
-    try {
-      if (scanner && scanning) await scanner.stop();
-    } catch (_) {}
-    scanning = false;
-    waitingForApp = false;
-    startButton.disabled = false;
-    stopButton.disabled = true;
-    setStatus('Cámara detenida.');
+  function cerrarLectorQR() {
+    closing = true;
+    startButton.disabled = true;
+
+    if (window.opener && !window.opener.closed) {
+      window.opener.focus();
+    }
+
+    // Se cierra directamente desde el clic para evitar bloqueos.
+    window.close();
+
+    // Solo se ejecutará si el navegador no ha cerrado la pestaña.
+    setTimeout(async () => {
+      try {
+        await detenerCamara();
+
+        setStatus(
+          'El navegador no permite cerrar esta pestaña automáticamente. ' +
+          'Ciérrala para volver a Jargolín.',
+          'error'
+        );
+      } catch (error) {
+        setStatus(
+          'Cierra esta pestaña para volver a Jargolín y apagar la cámara. ' +
+          'No se pudo detener automáticamente: ' +
+          (error.message || String(error)),
+          'error'
+        );
+      }
+    }, 300);
   }
 
   window.addEventListener('message', async event => {
-    if (event.source !== window.opener) return;
+    if (closing || !waitingForApp) return;
+    if (!window.opener || event.source !== window.opener) return;
+
     const data = event.data || {};
     if (data.type !== 'JARGOLIN_QR_RESULT') return;
 
     if (data.ok) {
       const familia = data.familia;
 
-if (familia) {
-  setStatus(
-    '✓ ENTRADA VALIDADA\n\n' +
-    'ID FAMILIA: ' + familia.id + '\n' +
-    'Adulto: ' + familia.adulto + '\n' +
-    'Niños: ' + (familia.ninos.length
-      ? familia.ninos.join(', ')
-      : 'Sin niños') + '\n\n' +
-    'Colocar ' + familia.totalPulseras + ' pulseras.',
-    'ok'
-  );
-} else {
-  setStatus(
-    data.message || 'Entrada validada correctamente.',
-    'ok'
-  );
-}
-      waitingForApp = false;
-      startButton.disabled = false;
-      stopButton.disabled = false;
-      if (scanner && scanning) {
-        try { await scanner.resume(); } catch (_) {}
+      if (familia) {
+        setStatus(
+          '✓ ENTRADA VALIDADA\n\n' +
+          'ID FAMILIA: ' + familia.id + '\n' +
+          'Adulto: ' + familia.adulto + '\n' +
+          'Niños: ' + (
+            familia.ninos.length
+              ? familia.ninos.join(', ')
+              : 'Sin niños'
+          ) + '\n\n' +
+          'Colocar ' + familia.totalPulseras + ' pulseras.',
+          'ok'
+        );
+      } else {
+        setStatus(
+          data.message || 'Entrada validada correctamente.',
+          'ok'
+        );
       }
     } else {
-      setStatus(data.message || 'No se ha podido validar este QR. Comprueba el aviso en Jargolín.', 'error');
-      waitingForApp = false;
-      startButton.disabled = false;
-      stopButton.disabled = false;
-      if (scanner && scanning) {
-        try { await scanner.resume(); } catch (_) {}
-      }
+      setStatus(
+        data.message ||
+        'No se ha podido validar este QR. Comprueba el aviso en Jargolín.',
+        'error'
+      );
     }
+
+    waitingForApp = false;
+    await reanudarCamara();
   });
 
   startButton.addEventListener('click', startScanner);
-  stopButton.addEventListener('click', stopScanner);
+  closeButton.addEventListener('click', cerrarLectorQR);
+
   window.addEventListener('beforeunload', () => {
-    if (scanner && scanning) scanner.stop().catch(() => {});
+    if (scanner && scanning) {
+      scanner.stop().catch(error => {
+        console.error('No se pudo detener la cámara al cerrar:', error);
+      });
+    }
   });
 </script>
 </body>
